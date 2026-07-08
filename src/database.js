@@ -1,6 +1,7 @@
 const mysql = require("mysql2/promise");
 const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
 const config = require("./config");
+const rdsCa = require("./rds-ca");
 
 let pool;
 
@@ -20,7 +21,10 @@ async function getPool() {
       password: secret.password,
       database: process.env.DB_NAME,
       connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 2),
-      ssl: { rejectUnauthorized: true }
+      ssl: {
+        ca: rdsCa,
+        rejectUnauthorized: true
+      }
     };
   }
   pool = mysql.createPool({

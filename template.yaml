@@ -45,24 +45,13 @@ Resources:
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Salida de Lambda hacia RDS Proxy
+      GroupDescription: Salida de Lambda hacia RDS MySQL
       VpcId: !Ref Vpc
 
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: MySQL solo desde Lambda
-      VpcId: !Ref Vpc
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          SourceSecurityGroupId: !Ref ProxySecurityGroup
-
-  ProxySecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: RDS Proxy solo desde Lambda
       VpcId: !Ref Vpc
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -124,47 +113,8 @@ Resources:
       DBSubnetGroupName: !Ref DatabaseSubnets
       VPCSecurityGroups: [!GetAtt DatabaseSecurityGroup.GroupId]
       PubliclyAccessible: false
-      BackupRetentionPeriod: 7
+      BackupRetentionPeriod: 0
       DeletionProtection: false
-
-  ProxyRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: { Service: rds.amazonaws.com }
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: ReadDatabaseSecret
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: !Ref DatabaseSecret
-
-  DatabaseProxy:
-    Type: AWS::RDS::DBProxy
-    Properties:
-      DBProxyName: !Sub "crud-${Environment}-proxy"
-      EngineFamily: MYSQL
-      RoleArn: !GetAtt ProxyRole.Arn
-      VpcSubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
-      VpcSecurityGroupIds: [!GetAtt ProxySecurityGroup.GroupId]
-      RequireTLS: true
-      Auth:
-        - AuthScheme: SECRETS
-          SecretArn: !Ref DatabaseSecret
-          IAMAuth: DISABLED
-
-  ProxyTargetGroup:
-    Type: AWS::RDS::DBProxyTargetGroup
-    Properties:
-      DBProxyName: !Ref DatabaseProxy
-      TargetGroupName: default
-      DBInstanceIdentifiers: [!Ref Database]
 
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -210,13 +160,13 @@ Resources:
 
   CrudFunction:
     Type: AWS::Serverless::Function
-    DependsOn: [ProxyTargetGroup, SecretsManagerEndpoint]
+    DependsOn: SecretsManagerEndpoint
     Properties:
       CodeUri: .
       Handler: src/lambda.handler
       Environment:
         Variables:
-          DB_HOST: !GetAtt DatabaseProxy.Endpoint
+          DB_HOST: !GetAtt Database.Endpoint.Address
           DB_PORT: 3306
           DB_NAME: crud_personas
           DB_SECRET_ARN: !Ref DatabaseSecret

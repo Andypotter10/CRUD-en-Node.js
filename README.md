@@ -7,12 +7,17 @@ El proyecto está preparado para desplegarse en la región de México (`mx-centr
 ## Arquitectura
 
 ```text
-Next.js / Amplify → Cognito → API Gateway → Lambda → RDS Proxy → RDS MySQL
+Next.js / Amazon S3 → Cognito → API Gateway → Lambda → RDS MySQL
 ```
 
-La API se publica mediante API Gateway y ejecuta el backend en AWS Lambda. Los datos se almacenan en MySQL usando Amazon RDS. La conexión entre Lambda y la base de datos se realiza mediante RDS Proxy, y las credenciales se administran con AWS Secrets Manager.
+La API se publica mediante API Gateway y ejecuta el backend en AWS Lambda. Los datos se almacenan en MySQL usando Amazon RDS. Lambda se conecta directamente a la instancia privada de RDS y las credenciales se administran con AWS Secrets Manager.
 
 RDS y Lambda se ejecutan dentro de subredes privadas. El endpoint `GET /health` es público para verificación de disponibilidad; los endpoints CRUD requieren autenticación con un ID token válido de Amazon Cognito.
+
+Servicios publicados:
+
+- API: `https://z3f3qeolh7.execute-api.mx-central-1.amazonaws.com/prod`
+- Web: `http://crud-personas-web-397572991247.s3-website.mx-central-1.amazonaws.com`
 
 ## Tecnologías principales
 
@@ -22,7 +27,6 @@ RDS y Lambda se ejecutan dentro de subredes privadas. El endpoint `GET /health` 
 - API Gateway
 - Amazon Cognito
 - Amazon RDS MySQL
-- RDS Proxy
 - AWS Secrets Manager
 - AWS SAM / CloudFormation
 - React
@@ -225,24 +229,25 @@ npm install
 npm run dev
 ```
 
-## Publicación del frontend en AWS Amplify
+## Publicación del frontend en Amazon S3
 
-Para publicar la interfaz:
+La aplicación usa la exportación estática de Next.js configurada en
+`web/next.config.mjs`. Antes de compilar, definir:
 
-1. Conectar el repositorio a AWS Amplify Hosting.
-2. Seleccionar la rama `main`.
-3. Configurar las variables de entorno:
-   - `NEXT_PUBLIC_API_URL`
-   - `NEXT_PUBLIC_COGNITO_USER_POOL_ID`
-   - `NEXT_PUBLIC_COGNITO_CLIENT_ID`
-4. Usar el archivo `amplify.yml` incluido en el repositorio.
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_COGNITO_USER_POOL_ID`
+- `NEXT_PUBLIC_COGNITO_CLIENT_ID`
+
+Después, ejecutar `npm run build` dentro de `web` y publicar el contenido de
+`web/out` en un bucket S3 configurado para alojamiento web.
 
 ## GitHub Actions
 
 El repositorio incluye workflows en `.github/workflows`:
 
 - `ci.yml`: instala dependencias, ejecuta pruebas del backend y compila la interfaz Next.js.
-- `deploy.yml`: despliega el backend en AWS usando AWS SAM.
+- `deploy.yml`: despliega el backend con AWS SAM, compila Next.js y sincroniza
+  la exportación web con Amazon S3.
 
 El workflow de despliegue usa OIDC para evitar llaves permanentes de AWS en GitHub. Para habilitarlo se debe configurar previamente:
 

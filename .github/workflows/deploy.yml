@@ -8,6 +8,13 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: mx-central-1
+  WEB_BUCKET: crud-personas-web-397572991247
+  NEXT_PUBLIC_API_URL: https://z3f3qeolh7.execute-api.mx-central-1.amazonaws.com/prod
+  NEXT_PUBLIC_COGNITO_USER_POOL_ID: mx-central-1_YRYIEbQZc
+  NEXT_PUBLIC_COGNITO_CLIENT_ID: 4uabms0vuakqsctba8dbcqlb3t
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -24,8 +31,10 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: mx-central-1
+          aws-region: ${{ env.AWS_REGION }}
       - run: pnpm install --frozen-lockfile
       - run: sam validate --lint
       - run: sam build
       - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+      - run: pnpm --dir web build
+      - run: aws s3 sync web/out "s3://${WEB_BUCKET}" --delete

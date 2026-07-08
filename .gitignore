@@ -2,7 +2,10 @@ node_modules/
 .env
 .env.local
 .next/
+out/
 .aws-sam/
 coverage/
 npm-debug.log*
+sam-deploy.*.log
+sam-deploy.exit
 .DS_Store
