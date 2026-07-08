@@ -1,0 +1,46 @@
+{
+  "info": {
+    "_postman_id": "aac60f40-9132-44df-b311-3cbf155184ae",
+    "name": "CRUD Personas API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "personaId", "value": "1" },
+    { "key": "idToken", "value": "PEGAR_TOKEN_COGNITO" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{idToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Crear persona",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombreCompleto\":\"María López García\",\"rfc\":\"LOGM900101AB1\",\"correoElectronico\":\"maria@example.com\",\"codigoPostal\":\"03100\"}"
+        },
+        "url": "{{baseUrl}}/api/personas"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": ["pm.test('Creada', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('personaId', pm.response.json().data.id);"] }
+      }]
+    },
+    { "name": "Listar personas", "request": { "method": "GET", "url": "{{baseUrl}}/api/personas" } },
+    { "name": "Obtener persona", "request": { "method": "GET", "url": "{{baseUrl}}/api/personas/{{personaId}}" } },
+    {
+      "name": "Actualizar persona",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"codigoPostal\":\"64000\"}" },
+        "url": "{{baseUrl}}/api/personas/{{personaId}}"
+      }
+    },
+    { "name": "Eliminar persona", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/personas/{{personaId}}" } }
+  ]
+}

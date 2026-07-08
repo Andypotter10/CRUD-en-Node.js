@@ -1,0 +1,28 @@
+:root { color-scheme: light; --ink:#17211d; --muted:#66736d; --paper:#f5f2e9; --green:#176b4d; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:Arial, sans-serif; }
+button,input { font:inherit; }
+.login { min-height:100vh; display:grid; place-items:center; padding:24px; }
+.login .card { width:min(420px,100%); }
+.shell { width:min(1180px,calc(100% - 32px)); margin:0 auto; padding:48px 0; }
+header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:32px; }
+h1,h2,p { margin-top:0; }
+h1 { font-size:clamp(2rem,5vw,4rem); letter-spacing:-.05em; margin-bottom:0; }
+.eyebrow { color:var(--green); font-size:.75rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; }
+.grid { display:grid; grid-template-columns:360px 1fr; gap:24px; align-items:start; }
+.card { background:#fff; padding:28px; border:1px solid #dedbd1; border-radius:18px; box-shadow:0 12px 30px #17211d10; }
+label { display:grid; gap:7px; color:var(--muted); font-size:.85rem; margin:16px 0; }
+input { width:100%; border:1px solid #c9cec9; border-radius:9px; padding:12px; color:var(--ink); background:#fff; }
+input:focus { outline:3px solid #176b4d25; border-color:var(--green); }
+button { border:0; border-radius:9px; padding:11px 16px; background:var(--green); color:#fff; font-weight:700; cursor:pointer; }
+form > button { width:100%; margin-top:8px; }
+.secondary { background:#e9eee9; color:var(--ink); }
+.danger { background:#8f2f2f; }
+.message { margin:16px 0 0; color:var(--green); }
+.list h2 { display:flex; justify-content:space-between; }
+.list h2 span { color:var(--muted); }
+article { display:flex; justify-content:space-between; gap:18px; align-items:center; padding:18px 0; border-top:1px solid #ebe9e1; }
+article small { display:block; color:var(--muted); margin-top:5px; overflow-wrap:anywhere; }
+.actions { display:flex; gap:8px; }
+.empty { color:var(--muted); padding:32px 0; text-align:center; }
+@media (max-width:800px) { .grid { grid-template-columns:1fr; } header,article { align-items:flex-start; } article { flex-direction:column; } }
