@@ -35,7 +35,7 @@ function createApp(repository) {
   const parseId = (req) => idSchema.parse(req.params.id);
 
   app.get("/health", (req, res) => {
-    res.json({ estado: "ok" });
+    res.json({ estado: "activo" });
   });
 
   app.post("/api/personas", asyncRoute(async (req, res) => {

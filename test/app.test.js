@@ -35,6 +35,12 @@ const valid = {
   codigoPostal: "03100"
 };
 
+test("reporta el servicio como activo", async () => {
+  const response = await request(createApp(repository())).get("/health");
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { estado: "activo" });
+});
+
 test("crea y normaliza una persona", async () => {
   const response = await request(createApp(repository()))
     .post("/api/personas")

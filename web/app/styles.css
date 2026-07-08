@@ -181,6 +181,29 @@ h1, h2, h3, p { margin-top: 0; }
 }
 .login-form { width: min(390px, 100%); }
 .mobile-brand { display: none; }
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 30px;
+  border-radius: 11px;
+  background: #f1f3f8;
+}
+.auth-switch button {
+  padding: 9px 10px;
+  color: #7d8599;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-size: .73rem;
+  font-weight: 750;
+}
+.auth-switch button.active {
+  color: var(--blue);
+  background: white;
+  box-shadow: 0 3px 10px rgba(40, 51, 91, .08);
+}
 .eyebrow, .panel-kicker {
   color: var(--blue);
   font-size: .72rem;
@@ -198,6 +221,7 @@ h1, h2, h3, p { margin-top: 0; }
   line-height: 1.65;
 }
 .form-intro { margin-bottom: 34px; font-size: .9rem; }
+.form-intro strong { color: #48516a; overflow-wrap: anywhere; }
 label { display: grid; gap: 8px; margin: 17px 0; }
 label > span { color: #3c4560; font-size: .78rem; font-weight: 700; }
 .input-wrap, .search-wrap {
@@ -257,6 +281,31 @@ input:focus {
 }
 .primary:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(78, 91, 214, .3); }
 .login-submit { width: 100%; margin-top: 25px; }
+.password-rules {
+  margin: -7px 0 4px;
+  color: #9299ab;
+  font-size: .66rem;
+  line-height: 1.45;
+}
+.confirmation-input input {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: .35em;
+}
+.confirmation-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 17px;
+}
+.confirmation-actions button {
+  padding: 0;
+  color: var(--blue);
+  background: transparent;
+  border: 0;
+  font-size: .7rem;
+  font-weight: 700;
+}
 .secure-note {
   display: flex;
   justify-content: center;

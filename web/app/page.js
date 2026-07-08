@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AuthenticationDetails,
   CognitoUser,
+  CognitoUserAttribute,
   CognitoUserPool
 } from "amazon-cognito-identity-js";
 
@@ -84,6 +85,10 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [query, setQuery] = useState("");
+  const [authMode, setAuthMode] = useState("login");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmationCode, setConfirmationCode] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
 
   useEffect(() => {
     const current = pool.getCurrentUser();
@@ -158,6 +163,74 @@ export default function Home() {
         }
       }
     );
+  }
+
+  function register(event) {
+    event.preventDefault();
+    setNotice(null);
+    if (credentials.password !== confirmPassword) {
+      setNotice({ type: "error", text: "Las contraseñas no coinciden" });
+      return;
+    }
+    setAuthLoading(true);
+    const attributes = [
+      new CognitoUserAttribute({ Name: "email", Value: credentials.email })
+    ];
+    pool.signUp(credentials.email, credentials.password, attributes, null, (error, result) => {
+      setAuthLoading(false);
+      if (error) {
+        setNotice({ type: "error", text: error.message });
+        return;
+      }
+      if (result.userConfirmed) {
+        setAuthMode("login");
+        setNotice({ type: "success", text: "Cuenta creada. Ya puedes iniciar sesión." });
+        return;
+      }
+      setPendingEmail(credentials.email);
+      setConfirmationCode("");
+      setAuthMode("confirm");
+      setNotice({ type: "success", text: "Enviamos un código de verificación a tu correo." });
+    });
+  }
+
+  function confirmAccount(event) {
+    event.preventDefault();
+    setNotice(null);
+    setAuthLoading(true);
+    const email = pendingEmail || credentials.email;
+    const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+    cognitoUser.confirmRegistration(confirmationCode.trim(), true, (error) => {
+      setAuthLoading(false);
+      if (error) {
+        setNotice({ type: "error", text: error.message });
+        return;
+      }
+      setCredentials({ email, password: "" });
+      setConfirmPassword("");
+      setConfirmationCode("");
+      setAuthMode("login");
+      setNotice({ type: "success", text: "Correo confirmado. Ya puedes iniciar sesión." });
+    });
+  }
+
+  function resendCode() {
+    const email = pendingEmail || credentials.email;
+    if (!email) return;
+    setNotice(null);
+    const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+    cognitoUser.resendConfirmationCode((error) => {
+      setNotice(error
+        ? { type: "error", text: error.message }
+        : { type: "success", text: "Enviamos un código nuevo a tu correo." });
+    });
+  }
+
+  function changeAuthMode(mode) {
+    setAuthMode(mode);
+    setNotice(null);
+    setConfirmationCode("");
+    setConfirmPassword("");
   }
 
   async function save(event) {
@@ -244,39 +317,95 @@ export default function Home() {
           </div>
 
           <div className="login-panel">
-            <form className="login-form" onSubmit={login}>
+            <form className="login-form"
+              onSubmit={authMode === "login" ? login : authMode === "register" ? register : confirmAccount}>
               <span className="mobile-brand">Personas<span>.</span></span>
-              <p className="eyebrow">Bienvenido de nuevo</p>
-              <h2>Inicia sesión</h2>
-              <p className="form-intro">Ingresa tus credenciales para acceder al panel administrativo.</p>
+              {authMode !== "confirm" && (
+                <div className="auth-switch" role="tablist" aria-label="Acceso a la cuenta">
+                  <button type="button" className={authMode === "login" ? "active" : ""}
+                    onClick={() => changeAuthMode("login")}>Iniciar sesión</button>
+                  <button type="button" className={authMode === "register" ? "active" : ""}
+                    onClick={() => changeAuthMode("register")}>Crear cuenta</button>
+                </div>
+              )}
 
-              <label>
-                <span>Correo electrónico</span>
-                <div className="input-wrap">
-                  <Icon name="mail" />
-                  <input type="email" required autoComplete="username"
-                    placeholder="nombre@empresa.com" value={credentials.email}
-                    onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} />
-                </div>
-              </label>
-              <label>
-                <span>Contraseña</span>
-                <div className="input-wrap">
-                  <Icon name="lock" />
-                  <input type={showPassword ? "text" : "password"} required
-                    autoComplete="current-password" placeholder="••••••••••••"
-                    value={credentials.password}
-                    onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} />
-                  <button type="button" className="icon-button password-toggle"
-                    aria-label="Mostrar u ocultar contraseña"
-                    onClick={() => setShowPassword((visible) => !visible)}>
-                    <Icon name="eye" />
+              <p className="eyebrow">
+                {authMode === "login" ? "Bienvenido de nuevo" : authMode === "register" ? "Únete a la plataforma" : "Verifica tu correo"}
+              </p>
+              <h2>
+                {authMode === "login" ? "Inicia sesión" : authMode === "register" ? "Crea tu cuenta" : "Confirma tu cuenta"}
+              </h2>
+              <p className="form-intro">
+                {authMode === "login" && "Ingresa tus credenciales para acceder al panel administrativo."}
+                {authMode === "register" && "Regístrate con tu correo. Te enviaremos un código para validar tu cuenta."}
+                {authMode === "confirm" && <>Escribe el código enviado a <strong>{pendingEmail || credentials.email}</strong>.</>}
+              </p>
+
+              {authMode === "confirm" ? (
+                <>
+                  <label>
+                    <span>Código de verificación</span>
+                    <div className="input-wrap confirmation-input">
+                      <Icon name="check" />
+                      <input required inputMode="numeric" autoComplete="one-time-code"
+                        maxLength={6} placeholder="000000" value={confirmationCode}
+                        onChange={(event) => setConfirmationCode(event.target.value.replace(/\D/g, ""))} />
+                    </div>
+                  </label>
+                  <button className="primary login-submit" disabled={authLoading || confirmationCode.length !== 6}>
+                    {authLoading ? <span className="spinner" /> : "Confirmar correo"}
                   </button>
-                </div>
-              </label>
-              <button className="primary login-submit" disabled={authLoading}>
-                {authLoading ? <span className="spinner" /> : "Entrar al panel"}
-              </button>
+                  <div className="confirmation-actions">
+                    <button type="button" onClick={resendCode}>Reenviar código</button>
+                    <button type="button" onClick={() => changeAuthMode("login")}>Volver al acceso</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label>
+                    <span>Correo electrónico</span>
+                    <div className="input-wrap">
+                      <Icon name="mail" />
+                      <input type="email" required autoComplete="username"
+                        placeholder="nombre@empresa.com" value={credentials.email}
+                        onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Contraseña</span>
+                    <div className="input-wrap">
+                      <Icon name="lock" />
+                      <input type={showPassword ? "text" : "password"} required
+                        autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                        placeholder="••••••••••••" value={credentials.password}
+                        onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} />
+                      <button type="button" className="icon-button password-toggle"
+                        aria-label="Mostrar u ocultar contraseña"
+                        onClick={() => setShowPassword((visible) => !visible)}>
+                        <Icon name="eye" />
+                      </button>
+                    </div>
+                  </label>
+                  {authMode === "register" && (
+                    <>
+                      <label>
+                        <span>Confirmar contraseña</span>
+                        <div className="input-wrap">
+                          <Icon name="lock" />
+                          <input type={showPassword ? "text" : "password"} required
+                            autoComplete="new-password" placeholder="Repite tu contraseña"
+                            value={confirmPassword}
+                            onChange={(event) => setConfirmPassword(event.target.value)} />
+                        </div>
+                      </label>
+                      <p className="password-rules">Mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo.</p>
+                    </>
+                  )}
+                  <button className="primary login-submit" disabled={authLoading}>
+                    {authLoading ? <span className="spinner" /> : authMode === "login" ? "Entrar al panel" : "Crear mi cuenta"}
+                  </button>
+                </>
+              )}
               {notice && <div className={`notice ${notice.type}`}>{notice.text}</div>}
               <div className="secure-note"><Icon name="lock" size={15} /> Conexión protegida con Amazon Cognito</div>
             </form>
