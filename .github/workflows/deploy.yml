@@ -34,7 +34,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - run: pnpm install --frozen-lockfile
       - run: sam validate --lint
-      - run: sam build
+      - run: pnpm exec sam build
       - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
       - run: pnpm --dir web build
       - run: aws s3 sync web/out "s3://${WEB_BUCKET}" --delete
