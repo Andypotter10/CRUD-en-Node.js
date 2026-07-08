@@ -33,8 +33,9 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - run: pnpm install --frozen-lockfile
+      - run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
       - run: sam validate --lint
-      - run: pnpm exec sam build
+      - run: sam build
       - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
       - run: pnpm --dir web build
       - run: aws s3 sync web/out "s3://${WEB_BUCKET}" --delete
