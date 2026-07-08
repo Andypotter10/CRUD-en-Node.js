@@ -1,29 +1,60 @@
-# CRUD de personas en AWS
+# CRUD en AWS
 
-Aplicación full-stack protegida con Amazon Cognito. El backend usa Node.js 22,
-Express, AWS Lambda, API Gateway y RDS MySQL; la interfaz usa React con Next.js.
-Toda la infraestructura se define en `template.yaml` con AWS SAM y se despliega
-en la región de México (`mx-central-1`). No requiere Docker.
+Microservicio CRUD desarrollado con Node.js, Express, AWS Lambda, API Gateway, Amazon Cognito y RDS MySQL. Incluye una interfaz web en React con Next.js, colección de Postman, definición de infraestructura con AWS SAM y workflows de GitHub Actions.
+
+El proyecto está preparado para desplegarse en la región de México (`mx-central-1`).
 
 ## Arquitectura
 
 ```text
-Next.js (AWS Amplify) → Cognito → API Gateway → Lambda → RDS Proxy → RDS MySQL
+Next.js / Amplify → Cognito → API Gateway → Lambda → RDS Proxy → RDS MySQL
 ```
 
-RDS y Lambda permanecen en subredes privadas. Las credenciales se generan en
-Secrets Manager y nunca se guardan en Git. `GET /health` es público; todo el
-CRUD requiere un ID token válido de Cognito.
+La API se publica mediante API Gateway y ejecuta el backend en AWS Lambda. Los datos se almacenan en MySQL usando Amazon RDS. La conexión entre Lambda y la base de datos se realiza mediante RDS Proxy, y las credenciales se administran con AWS Secrets Manager.
+
+RDS y Lambda se ejecutan dentro de subredes privadas. El endpoint `GET /health` es público para verificación de disponibilidad; los endpoints CRUD requieren autenticación con un ID token válido de Amazon Cognito.
+
+## Tecnologías principales
+
+- Node.js 22
+- Express
+- AWS Lambda
+- API Gateway
+- Amazon Cognito
+- Amazon RDS MySQL
+- RDS Proxy
+- AWS Secrets Manager
+- AWS SAM / CloudFormation
+- React
+- Next.js
+- Postman
+- GitHub Actions
+
+## Requisitos previos
+
+Para ejecutar y desplegar el proyecto se requiere:
+
+- Node.js 22 o superior
+- npm
+- Git
+- MySQL local, solo si se desea ejecutar la API contra una base local
+- AWS CLI configurado
+- AWS SAM CLI instalado
+- Una cuenta de AWS con permisos para crear recursos de CloudFormation, IAM, VPC, Lambda, API Gateway, Cognito, Secrets Manager y RDS
 
 ## API
 
-| Método | Ruta | Acción |
-|---|---|---|
-| POST | `/api/personas` | Crear |
-| GET | `/api/personas` | Listar |
-| GET | `/api/personas/:id` | Consultar |
-| PUT/PATCH | `/api/personas/:id` | Actualizar |
-| DELETE | `/api/personas/:id` | Eliminar |
+| Método | Ruta | Descripción | Autenticación |
+|---|---|---|---|
+| GET | `/health` | Verificar estado del servicio | No |
+| POST | `/api/personas` | Crear registro | Sí |
+| GET | `/api/personas` | Listar registros | Sí |
+| GET | `/api/personas/:id` | Consultar registro por ID | Sí |
+| PUT | `/api/personas/:id` | Actualizar registro completo | Sí |
+| PATCH | `/api/personas/:id` | Actualizar registro parcial | Sí |
+| DELETE | `/api/personas/:id` | Eliminar registro | Sí |
+
+Ejemplo de cuerpo JSON:
 
 ```json
 {
@@ -34,43 +65,75 @@ CRUD requiere un ID token válido de Cognito.
 }
 ```
 
-RFC, correo, campos obligatorios y código postal se validan en el backend. RFC
-y correo son únicos en MySQL.
+## Validaciones
 
-## Pruebas locales sin Docker
+El backend valida:
 
-Las pruebas HTTP usan un repositorio en memoria, por lo que no requieren MySQL:
+- campos obligatorios;
+- formato de RFC;
+- formato de correo electrónico;
+- código postal mexicano de 5 dígitos;
+- unicidad de RFC y correo electrónico en MySQL.
+
+Las respuestas de error también se devuelven en formato JSON.
+
+## Instalación local
+
+Instalar dependencias:
 
 ```bash
 npm install
+```
+
+Ejecutar pruebas:
+
+```bash
 npm test
 ```
 
-Para ejecutar la API contra una instalación local de MySQL:
+Las pruebas HTTP usan un repositorio en memoria, por lo que no requieren una instalación local de MySQL.
+
+## Ejecución local con MySQL
+
+Para ejecutar la API localmente contra MySQL:
 
 ```powershell
 Copy-Item .env.example .env
+```
+
+Después se deben configurar las variables `DB_*` dentro del archivo `.env` con los datos de conexión de una base MySQL local.
+
+Ejecutar la API:
+
+```bash
 npm start
 ```
 
-Configure primero las variables `DB_*` de `.env`. La tabla se crea al arrancar.
+La aplicación crea automáticamente la tabla `personas` si no existe.
 
 ## Despliegue del backend en AWS
 
-Requisitos: AWS CLI y AWS SAM CLI configurados con una cuenta que pueda crear
-CloudFormation, IAM, VPC, Lambda, API Gateway, Cognito, Secrets Manager y RDS.
+Validar y construir la aplicación con AWS SAM:
 
 ```bash
 sam validate --lint
 sam build
+```
+
+Desplegar:
+
+```bash
 sam deploy --guided
 ```
 
-En el primer despliegue conserve `mx-central-1`, el stack
-`crud-personas-prod` y guarde la configuración. Crear RDS y RDS Proxy genera
-cargos; elimine el stack al terminar la evaluación si ya no lo necesita.
+Valores recomendados para el primer despliegue:
 
-Al finalizar, consulte los outputs:
+- región: `mx-central-1`
+- stack name: `crud-personas-prod`
+- capabilities: `CAPABILITY_IAM`
+- guardar configuración: `yes`
+
+Al finalizar el despliegue, consultar los outputs:
 
 ```bash
 aws cloudformation describe-stacks \
@@ -79,9 +142,17 @@ aws cloudformation describe-stacks \
   --query "Stacks[0].Outputs"
 ```
 
-## Crear el primer usuario privado
+Los outputs principales son:
 
-Cognito no expone registro público. Use el `UserPoolId` mostrado en los outputs:
+- `ApiUrl`: URL pública del API Gateway;
+- `UserPoolId`: identificador del User Pool de Cognito;
+- `UserPoolClientId`: identificador del cliente de Cognito.
+
+> Nota: el despliegue crea recursos de AWS que pueden generar costo, especialmente Amazon RDS. Si el ambiente ya no se necesita, se recomienda eliminar el stack desde CloudFormation.
+
+## Crear usuario de Cognito
+
+Usar el `UserPoolId` generado por el despliegue:
 
 ```bash
 aws cognito-idp admin-create-user \
@@ -89,7 +160,11 @@ aws cognito-idp admin-create-user \
   --username evaluador@ejemplo.com \
   --user-attributes Name=email,Value=evaluador@ejemplo.com Name=email_verified,Value=true \
   --region mx-central-1
+```
 
+Asignar contraseña permanente:
+
+```bash
 aws cognito-idp admin-set-user-password \
   --user-pool-id ID_DEL_POOL \
   --username evaluador@ejemplo.com \
@@ -98,32 +173,81 @@ aws cognito-idp admin-set-user-password \
   --region mx-central-1
 ```
 
-## Postman
+Ese usuario puede utilizarse para iniciar sesión desde la interfaz web y obtener un ID token válido para Postman.
 
-Importe `postman/CRUD-Personas.postman_collection.json`, cambie `baseUrl` por el
-output `ApiUrl` y pegue un ID token de Cognito en `idToken`. Ejecute las
-peticiones en orden; la colección guarda el ID del registro creado.
+## Pruebas con Postman
 
-## Interfaz Next.js y Amplify
+El repositorio incluye la colección:
 
-Copie `web/.env.local.example` a `web/.env.local` y reemplace sus tres valores
-con los outputs de SAM:
+```text
+postman/CRUD-Personas.postman_collection.json
+```
+
+Pasos sugeridos:
+
+1. Importar la colección en Postman.
+2. Configurar la variable `baseUrl` con el output `ApiUrl`.
+3. Configurar la variable `idToken` con un ID token válido de Cognito.
+4. Ejecutar las peticiones CRUD.
+
+La colección usa Bearer Auth con `{{idToken}}`. Al crear un registro, la colección guarda automáticamente el ID para reutilizarlo en las peticiones de consulta, actualización y eliminación.
+
+## Interfaz web con Next.js
+
+La interfaz se encuentra en la carpeta `web`.
+
+Configurar variables de entorno:
 
 ```bash
 cd web
+cp .env.local.example .env.local
+```
+
+En Windows PowerShell:
+
+```powershell
+cd web
+Copy-Item .env.local.example .env.local
+```
+
+Completar los valores:
+
+```text
+NEXT_PUBLIC_API_URL=
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=
+NEXT_PUBLIC_COGNITO_CLIENT_ID=
+```
+
+Ejecutar en desarrollo:
+
+```bash
 npm install
 npm run dev
 ```
 
-Para publicar, conecte este repositorio a AWS Amplify Hosting, seleccione la
-rama `main` y agregue `NEXT_PUBLIC_API_URL`,
-`NEXT_PUBLIC_COGNITO_USER_POOL_ID` y `NEXT_PUBLIC_COGNITO_CLIENT_ID` como
-variables de entorno. Amplify detectará `amplify.yml`.
+## Publicación del frontend en AWS Amplify
+
+Para publicar la interfaz:
+
+1. Conectar el repositorio a AWS Amplify Hosting.
+2. Seleccionar la rama `main`.
+3. Configurar las variables de entorno:
+   - `NEXT_PUBLIC_API_URL`
+   - `NEXT_PUBLIC_COGNITO_USER_POOL_ID`
+   - `NEXT_PUBLIC_COGNITO_CLIENT_ID`
+4. Usar el archivo `amplify.yml` incluido en el repositorio.
 
 ## GitHub Actions
 
-`CI` prueba API y compila Next.js. `Deploy AWS` usa OIDC, sin llaves AWS
-permanentes. En el environment `production` de GitHub agregue el secreto
-`AWS_DEPLOY_ROLE_ARN`, apuntando a un rol que confíe en el proveedor OIDC de
-GitHub y tenga permisos de despliegue. Después ejecute manualmente el workflow
-o haga push a `main`.
+El repositorio incluye workflows en `.github/workflows`:
+
+- `ci.yml`: instala dependencias, ejecuta pruebas del backend y compila la interfaz Next.js.
+- `deploy.yml`: despliega el backend en AWS usando AWS SAM.
+
+El workflow de despliegue usa OIDC para evitar llaves permanentes de AWS en GitHub. Para habilitarlo se debe configurar previamente:
+
+1. un proveedor OIDC de GitHub en AWS IAM;
+2. un rol IAM con permisos de despliegue;
+3. el secreto `AWS_DEPLOY_ROLE_ARN` en el environment `production` de GitHub.
+
+Después de configurar el rol y el secreto, el despliegue puede ejecutarse manualmente desde GitHub Actions o mediante push a `main`.
