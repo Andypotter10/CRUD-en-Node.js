@@ -122,8 +122,6 @@ Resources:
       UserPoolName: !Sub "crud-${Environment}-usuarios"
       UsernameAttributes: [email]
       AutoVerifiedAttributes: [email]
-      AdminCreateUserConfig:
-        AllowAdminCreateUserOnly: false
       Policies:
         PasswordPolicy:
           MinimumLength: 8
