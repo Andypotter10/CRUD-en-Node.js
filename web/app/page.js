@@ -89,6 +89,7 @@ export default function Home() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     const current = pool.getCurrentUser();
@@ -100,6 +101,19 @@ export default function Home() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape" && !saving) closeModal();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [modalOpen, saving]);
 
   const filteredPersonas = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -244,6 +258,7 @@ export default function Home() {
       });
       setForm(emptyForm);
       setEditing(null);
+      setModalOpen(false);
       setNotice({
         type: "success",
         text: editing ? "Los cambios se guardaron correctamente" : "La persona fue registrada correctamente"
@@ -276,10 +291,19 @@ export default function Home() {
       codigoPostal: persona.codigoPostal
     });
     setNotice(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setModalOpen(true);
   }
 
-  function cancelEditing() {
+  function openCreateModal() {
+    setEditing(null);
+    setForm(emptyForm);
+    setNotice(null);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    if (saving) return;
+    setModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
   }
@@ -423,8 +447,8 @@ export default function Home() {
           <span>Personas<span className="brand-dot">.</span></span>
         </div>
         <nav>
-          <a className="active" href="#directorio"><Icon name="users" /> Directorio</a>
-          <a href="#registro"><Icon name="plus" /> Nuevo registro</a>
+          <button className="active" type="button"><Icon name="users" /> Directorio</button>
+          <button type="button" onClick={openCreateModal}><Icon name="plus" /> Nuevo registro</button>
         </nav>
         <div className="sidebar-status">
           <span className="status-dot" />
@@ -440,6 +464,9 @@ export default function Home() {
           </div>
           <div className="topbar-actions">
             <span className="environment"><span className="status-dot" /> AWS México</span>
+            <button className="primary topbar-create" onClick={openCreateModal}>
+              <Icon name="plus" /> Nueva persona
+            </button>
             <button className="ghost-button" onClick={logout}><Icon name="logout" /> Salir</button>
           </div>
         </header>
@@ -467,40 +494,7 @@ export default function Home() {
           </article>
         </section>
 
-        <section className="workspace-grid">
-          <form id="registro" className="panel form-panel" onSubmit={save}>
-            <div className="panel-heading">
-              <div>
-                <span className="panel-kicker">{editing ? "Editando registro" : "Alta de persona"}</span>
-                <h2>{editing ? "Actualizar información" : "Nueva persona"}</h2>
-              </div>
-              <span className="heading-icon"><Icon name={editing ? "edit" : "plus"} /></span>
-            </div>
-            <p className="panel-description">
-              {editing ? "Modifica los campos necesarios y guarda los cambios." : "Completa los datos obligatorios para crear un registro."}
-            </p>
-
-            <div className="fields">
-              {fields.map((field) => (
-                <label key={field.key}>
-                  <span>{field.label}</span>
-                  <div className="input-wrap">
-                    <Icon name={field.icon} />
-                    <input required type={field.type || "text"} inputMode={field.inputMode}
-                      placeholder={field.placeholder} value={form[field.key]}
-                      maxLength={field.key === "rfc" ? 13 : field.key === "codigoPostal" ? 5 : undefined}
-                      onChange={(event) => setForm({ ...form, [field.key]: event.target.value })} />
-                  </div>
-                </label>
-              ))}
-            </div>
-            <button className="primary save-button" disabled={saving}>
-              {saving ? <span className="spinner" /> : <><Icon name={editing ? "check" : "plus"} /> {editing ? "Guardar cambios" : "Crear registro"}</>}
-            </button>
-            {editing && <button type="button" className="cancel-button" onClick={cancelEditing}>Cancelar edición</button>}
-          </form>
-
-          <section id="directorio" className="panel directory-panel">
+        <section id="directorio" className="panel directory-panel">
             <div className="directory-header">
               <div>
                 <span className="panel-kicker">Base de datos</span>
@@ -547,11 +541,61 @@ export default function Home() {
                 </div>
               )}
             </div>
-          </section>
         </section>
 
         <footer>CRUD Personas · Node.js, Next.js y AWS · {new Date().getFullYear()}</footer>
       </main>
+
+      {modalOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeModal();
+        }}>
+          <section className="record-modal" role="dialog" aria-modal="true"
+            aria-labelledby="record-modal-title">
+            <form onSubmit={save}>
+              <div className="modal-header">
+                <span className={`modal-symbol ${editing ? "editing" : ""}`}>
+                  <Icon name={editing ? "edit" : "plus"} />
+                </span>
+                <div>
+                  <span className="panel-kicker">{editing ? "Edición de registro" : "Alta de persona"}</span>
+                  <h2 id="record-modal-title">{editing ? "Editar persona" : "Nueva persona"}</h2>
+                  <p>{editing
+                    ? "Actualiza la información de esta persona. Los cambios se guardarán en MySQL."
+                    : "Completa los datos para agregar una persona al directorio."}</p>
+                </div>
+                <button type="button" className="modal-close" onClick={closeModal}
+                  aria-label="Cerrar formulario">×</button>
+              </div>
+
+              <div className="modal-fields">
+                {fields.map((field) => (
+                  <label key={field.key}>
+                    <span>{field.label}</span>
+                    <div className="input-wrap">
+                      <Icon name={field.icon} />
+                      <input required type={field.type || "text"} inputMode={field.inputMode}
+                        placeholder={field.placeholder} value={form[field.key]}
+                        maxLength={field.key === "rfc" ? 13 : field.key === "codigoPostal" ? 5 : undefined}
+                        onChange={(event) => setForm({ ...form, [field.key]: event.target.value })} />
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="modal-cancel" onClick={closeModal}>Cancelar</button>
+                <button className="primary modal-save" disabled={saving}>
+                  {saving ? <span className="spinner" /> : <>
+                    <Icon name={editing ? "check" : "plus"} />
+                    {editing ? "Guardar cambios" : "Crear registro"}
+                  </>}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
