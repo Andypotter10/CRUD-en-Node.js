@@ -90,6 +90,9 @@ export default function Home() {
   const [confirmationCode, setConfirmationCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [resetCode, setResetCode] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState("");
 
   useEffect(() => {
     const current = pool.getCurrentUser();
@@ -240,11 +243,73 @@ export default function Home() {
     });
   }
 
+  function requestPasswordReset(event) {
+    event.preventDefault();
+    const email = credentials.email.trim();
+    setNotice(null);
+    setAuthLoading(true);
+    const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+    cognitoUser.forgotPassword({
+      onFailure: (error) => {
+        setAuthLoading(false);
+        setNotice({ type: "error", text: error.message });
+      },
+      inputVerificationCode: () => {
+        setAuthLoading(false);
+        setPendingEmail(email);
+        setResetCode("");
+        setAuthMode("reset");
+        setNotice({ type: "success", text: "Enviamos un código de recuperación a tu correo." });
+      }
+    });
+  }
+
+  function completePasswordReset(event) {
+    event.preventDefault();
+    setNotice(null);
+    if (resetPassword !== resetPasswordConfirmation) {
+      setNotice({ type: "error", text: "Las contraseñas no coinciden" });
+      return;
+    }
+    setAuthLoading(true);
+    const email = pendingEmail || credentials.email;
+    const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+    cognitoUser.confirmPassword(resetCode.trim(), resetPassword, {
+      onSuccess: () => {
+        setAuthLoading(false);
+        setCredentials({ email, password: "" });
+        setResetCode("");
+        setResetPassword("");
+        setResetPasswordConfirmation("");
+        setAuthMode("login");
+        setNotice({ type: "success", text: "Contraseña actualizada. Ya puedes iniciar sesión." });
+      },
+      onFailure: (error) => {
+        setAuthLoading(false);
+        setNotice({ type: "error", text: error.message });
+      }
+    });
+  }
+
+  function resendPasswordResetCode() {
+    const email = pendingEmail || credentials.email;
+    setNotice(null);
+    const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+    cognitoUser.forgotPassword({
+      onFailure: (error) => setNotice({ type: "error", text: error.message }),
+      inputVerificationCode: () =>
+        setNotice({ type: "success", text: "Enviamos un código nuevo a tu correo." })
+    });
+  }
+
   function changeAuthMode(mode) {
     setAuthMode(mode);
     setNotice(null);
     setConfirmationCode("");
     setConfirmPassword("");
+    setResetCode("");
+    setResetPassword("");
+    setResetPasswordConfirmation("");
   }
 
   async function save(event) {
@@ -329,8 +394,7 @@ export default function Home() {
             </div>
             <div className="story-copy">
               <span className="pill"><span className="status-dot" /> Infraestructura activa</span>
-              <h1>Información organizada.<br /><em>Decisiones más simples.</em></h1>
-              <p>Una plataforma segura para administrar registros de personas, respaldada por servicios administrados de AWS.</p>
+              <span className="story-emblem"><Icon name="users" size={68} /></span>
             </div>
             <div className="architecture">
               <div><Icon name="cloud" /><span>API serverless</span><small>AWS Lambda</small></div>
@@ -342,9 +406,15 @@ export default function Home() {
 
           <div className="login-panel">
             <form className="login-form"
-              onSubmit={authMode === "login" ? login : authMode === "register" ? register : confirmAccount}>
+              onSubmit={
+                authMode === "login" ? login
+                  : authMode === "register" ? register
+                    : authMode === "confirm" ? confirmAccount
+                      : authMode === "forgot" ? requestPasswordReset
+                        : completePasswordReset
+              }>
               <span className="mobile-brand">Personas<span>.</span></span>
-              {authMode !== "confirm" && (
+              {(authMode === "login" || authMode === "register") && (
                 <div className="auth-switch" role="tablist" aria-label="Acceso a la cuenta">
                   <button type="button" className={authMode === "login" ? "active" : ""}
                     onClick={() => changeAuthMode("login")}>Iniciar sesión</button>
@@ -354,15 +424,25 @@ export default function Home() {
               )}
 
               <p className="eyebrow">
-                {authMode === "login" ? "Bienvenido de nuevo" : authMode === "register" ? "Únete a la plataforma" : "Verifica tu correo"}
+                {authMode === "login" && "Bienvenido de nuevo"}
+                {authMode === "register" && "Únete a la plataforma"}
+                {authMode === "confirm" && "Verifica tu correo"}
+                {authMode === "forgot" && "Recupera tu acceso"}
+                {authMode === "reset" && "Crea una contraseña nueva"}
               </p>
               <h2>
-                {authMode === "login" ? "Inicia sesión" : authMode === "register" ? "Crea tu cuenta" : "Confirma tu cuenta"}
+                {authMode === "login" && "Inicia sesión"}
+                {authMode === "register" && "Crea tu cuenta"}
+                {authMode === "confirm" && "Confirma tu cuenta"}
+                {authMode === "forgot" && "¿Olvidaste tu contraseña?"}
+                {authMode === "reset" && "Restablece tu contraseña"}
               </h2>
               <p className="form-intro">
                 {authMode === "login" && "Ingresa tus credenciales para acceder al panel administrativo."}
                 {authMode === "register" && "Regístrate con tu correo. Te enviaremos un código para validar tu cuenta."}
                 {authMode === "confirm" && <>Escribe el código enviado a <strong>{pendingEmail || credentials.email}</strong>.</>}
+                {authMode === "forgot" && "Escribe el correo de tu cuenta y te enviaremos un código de recuperación."}
+                {authMode === "reset" && <>Escribe el código enviado a <strong>{pendingEmail || credentials.email}</strong> y elige una contraseña nueva.</>}
               </p>
 
               {authMode === "confirm" ? (
@@ -381,6 +461,62 @@ export default function Home() {
                   </button>
                   <div className="confirmation-actions">
                     <button type="button" onClick={resendCode}>Reenviar código</button>
+                    <button type="button" onClick={() => changeAuthMode("login")}>Volver al acceso</button>
+                  </div>
+                </>
+              ) : authMode === "forgot" ? (
+                <>
+                  <label>
+                    <span>Correo electrónico</span>
+                    <div className="input-wrap">
+                      <Icon name="mail" />
+                      <input type="email" required autoComplete="username"
+                        placeholder="nombre@empresa.com" value={credentials.email}
+                        onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} />
+                    </div>
+                  </label>
+                  <button className="primary login-submit" disabled={authLoading}>
+                    {authLoading ? <span className="spinner" /> : "Enviar código"}
+                  </button>
+                  <div className="confirmation-actions centered">
+                    <button type="button" onClick={() => changeAuthMode("login")}>Volver al inicio de sesión</button>
+                  </div>
+                </>
+              ) : authMode === "reset" ? (
+                <>
+                  <label>
+                    <span>Código de recuperación</span>
+                    <div className="input-wrap confirmation-input">
+                      <Icon name="check" />
+                      <input required inputMode="numeric" autoComplete="one-time-code"
+                        maxLength={6} placeholder="000000" value={resetCode}
+                        onChange={(event) => setResetCode(event.target.value.replace(/\D/g, ""))} />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Nueva contraseña</span>
+                    <div className="input-wrap">
+                      <Icon name="lock" />
+                      <input type={showPassword ? "text" : "password"} required autoComplete="new-password"
+                        placeholder="••••••••••••" value={resetPassword}
+                        onChange={(event) => setResetPassword(event.target.value)} />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Confirmar contraseña</span>
+                    <div className="input-wrap">
+                      <Icon name="lock" />
+                      <input type={showPassword ? "text" : "password"} required autoComplete="new-password"
+                        placeholder="Repite tu contraseña" value={resetPasswordConfirmation}
+                        onChange={(event) => setResetPasswordConfirmation(event.target.value)} />
+                    </div>
+                  </label>
+                  <p className="password-rules">Mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo.</p>
+                  <button className="primary login-submit" disabled={authLoading || resetCode.length !== 6}>
+                    {authLoading ? <span className="spinner" /> : "Actualizar contraseña"}
+                  </button>
+                  <div className="confirmation-actions">
+                    <button type="button" onClick={resendPasswordResetCode}>Reenviar código</button>
                     <button type="button" onClick={() => changeAuthMode("login")}>Volver al acceso</button>
                   </div>
                 </>
@@ -410,6 +546,10 @@ export default function Home() {
                       </button>
                     </div>
                   </label>
+                  {authMode === "login" && (
+                    <button type="button" className="forgot-password"
+                      onClick={() => changeAuthMode("forgot")}>Olvidé mi contraseña</button>
+                  )}
                   {authMode === "register" && (
                     <>
                       <label>
