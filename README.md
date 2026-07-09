@@ -16,8 +16,12 @@ RDS y Lambda se ejecutan dentro de subredes privadas. El endpoint `GET /health` 
 
 Servicios publicados:
 
-- API: `https://z3f3qeolh7.execute-api.mx-central-1.amazonaws.com/prod`
-- Web: `http://crud-personas-web-397572991247.s3-website.mx-central-1.amazonaws.com`
+- URL base del API: `https://z3f3qeolh7.execute-api.mx-central-1.amazonaws.com/prod`
+- [Estado del API](https://z3f3qeolh7.execute-api.mx-central-1.amazonaws.com/prod/health)
+- [Interfaz web](http://crud-personas-web-397572991247.s3-website.mx-central-1.amazonaws.com)
+
+> La URL del API debe conservar el stage `/prod`. Abrir `/health` sin `/prod`
+> produce la respuesta `Missing Authentication Token` de API Gateway.
 
 ## Tecnologías principales
 
