@@ -93,6 +93,8 @@ export default function Home() {
   const [resetCode, setResetCode] = useState("");
   const [resetPassword, setResetPassword] = useState("");
   const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState("");
+  const [personToDelete, setPersonToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const current = pool.getCurrentUser();
@@ -106,9 +108,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!modalOpen) return undefined;
+    if (!modalOpen && !personToDelete) return undefined;
     const closeOnEscape = (event) => {
-      if (event.key === "Escape" && !saving) closeModal();
+      if (event.key !== "Escape") return;
+      if (modalOpen && !saving) closeModal();
+      if (personToDelete && !deleting) setPersonToDelete(null);
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
@@ -116,7 +120,7 @@ export default function Home() {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [modalOpen, saving]);
+  }, [modalOpen, personToDelete, saving, deleting]);
 
   const filteredPersonas = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -336,14 +340,19 @@ export default function Home() {
     }
   }
 
-  async function remove(id) {
-    if (!window.confirm("¿Seguro que deseas eliminar este registro?")) return;
+  async function remove() {
+    if (!personToDelete) return;
+    setDeleting(true);
     try {
-      await api(`/${id}`, { method: "DELETE" });
+      await api(`/${personToDelete.id}`, { method: "DELETE" });
+      setPersonToDelete(null);
       setNotice({ type: "success", text: "El registro fue eliminado" });
       await loadPersonas();
     } catch (error) {
+      setPersonToDelete(null);
       setNotice({ type: "error", text: error.message });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -668,7 +677,7 @@ export default function Home() {
                   <div className="record-actions">
                     <button className="icon-button edit-button" onClick={() => startEditing(persona)}
                       aria-label={`Editar a ${persona.nombreCompleto}`}><Icon name="edit" /></button>
-                    <button className="icon-button delete-button" onClick={() => remove(persona.id)}
+                    <button className="icon-button delete-button" onClick={() => setPersonToDelete(persona)}
                       aria-label={`Eliminar a ${persona.nombreCompleto}`}><Icon name="trash" /></button>
                   </div>
                 </article>
@@ -733,6 +742,43 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {personToDelete && (
+        <div className="modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !deleting) setPersonToDelete(null);
+        }}>
+          <section className="delete-confirm-modal" role="alertdialog" aria-modal="true"
+            aria-labelledby="delete-modal-title" aria-describedby="delete-modal-description">
+            <button type="button" className="modal-close delete-modal-close"
+              onClick={() => setPersonToDelete(null)} disabled={deleting}
+              aria-label="Cerrar confirmación">×</button>
+            <span className="delete-symbol"><Icon name="trash" size={25} /></span>
+            <span className="panel-kicker danger-kicker">Acción irreversible</span>
+            <h2 id="delete-modal-title">Eliminar persona</h2>
+            <p id="delete-modal-description">
+              Confirma que deseas eliminar este registro del directorio.
+            </p>
+            <div className="delete-person-preview">
+              <span className="avatar">{initials(personToDelete.nombreCompleto)}</span>
+              <div>
+                <strong>{personToDelete.nombreCompleto}</strong>
+                <small>{personToDelete.correoElectronico}</small>
+              </div>
+            </div>
+            <div className="delete-warning">
+              <Icon name="trash" size={17} />
+              Esta acción eliminará definitivamente la información almacenada en MySQL.
+            </div>
+            <div className="modal-actions delete-modal-actions">
+              <button type="button" className="modal-cancel"
+                onClick={() => setPersonToDelete(null)} disabled={deleting}>Cancelar</button>
+              <button type="button" className="danger-confirm" onClick={remove} disabled={deleting}>
+                {deleting ? <span className="spinner" /> : <><Icon name="trash" size={17} /> Eliminar registro</>}
+              </button>
+            </div>
           </section>
         </div>
       )}
